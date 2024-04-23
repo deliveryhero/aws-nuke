@@ -74,12 +74,14 @@ func (c *Credentials) rootSession() (*session.Session, error) {
 
 		region := DefaultRegionID
 		log.Debugf("creating new root session in %s", region)
+		retrier := NewCustomRetryer()
 
 		switch {
 		case c.HasAwsCredentials():
 			opts = session.Options{
 				Config: aws.Config{
 					Credentials: c.Credentials,
+					Retryer:     retrier,
 				},
 			}
 		case c.HasProfile() && c.HasKeys():
@@ -89,6 +91,7 @@ func (c *Credentials) rootSession() (*session.Session, error) {
 			opts = session.Options{
 				Config: aws.Config{
 					Credentials: c.awsNewStaticCredentials(),
+					Retryer:     retrier,
 				},
 			}
 
@@ -100,6 +103,9 @@ func (c *Credentials) rootSession() (*session.Session, error) {
 				SharedConfigState:       session.SharedConfigEnable,
 				Profile:                 c.Profile,
 				AssumeRoleTokenProvider: stscreds.StdinTokenProvider,
+				Config: aws.Config{
+					Retryer: retrier,
+				},
 			}
 
 		}
@@ -157,6 +163,7 @@ func (c *Credentials) NewSession(region, serviceType string) (*session.Session, 
 			Region:      &region,
 			Endpoint:    &customService.URL,
 			Credentials: c.awsNewStaticCredentials(),
+			Retryer:     NewCustomRetryer(),
 		}
 		if customService.TLSInsecureSkipVerify {
 			conf.HTTPClient = &http.Client{Transport: &http.Transport{
